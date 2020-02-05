@@ -1,33 +1,28 @@
-use std::fs;
-use std::io::prelude::*;
-use std::net::{TcpListener, TcpStream};
+use std::io::Result;
 
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+use actix_web::{client::Client, web, App, HttpResponse, HttpServer};
 
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
+#[actix_rt::main]
+async fn main() -> Result<()> {
+    let endpoint = "127.0.0.1:7878";
 
-        handle_connection(stream);
-    }
+    HttpServer::new(|| {
+        App::new()
+            .data(Client::default())
+            .service(web::resource("/").route(web::get().to(index)))
+            .default_service(web::route().to(not_found))
+    })
+    .bind(endpoint)?
+    .run()
+    .await
 }
 
-fn handle_connection(mut stream: TcpStream) {
-    let mut buffer = [0; 512];
-    stream.read(&mut buffer).unwrap();
+async fn not_found() -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok()
+        .content_type("text/*")
+        .body("Whoops not found!"))
+}
 
-    let get = b"GET / HTTP/1.1\r\n";
-
-    let (status_line, filename) = if buffer.starts_with(get) {
-        ("HTTP/1.1 200 OK\r\n\r\n", "hello.html")
-    } else {
-        ("HTTP/1.1 404 NOT FOUND\r\n\r\n", "404.html")
-    };
-
-    let contents = fs::read_to_string(filename).unwrap();
-
-    let response = format!("{}{}", status_line, contents);
-
-    stream.write(response.as_bytes()).unwrap();
-    stream.flush().unwrap();
+async fn index(_data: (), _client: web::Data<Client>) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().content_type("text/*").body("hey nice!"))
 }
