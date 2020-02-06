@@ -26,19 +26,18 @@ async fn not_found() -> Result<HttpResponse, Error> {
 }
 
 fn create_img_tag(url: String) -> String {
-    return format!("<img src=\"{}\" />", url);
+    format!("<img src=\"{}\" style=\"max-width: 300px\" />", url)
 }
 
 async fn index(_data: (), _client: web::Data<Client>) -> Result<HttpResponse, failure::Error> {
-    let dog_urls_result = dog_api::get_dog_urls(5).await;
-
-    match dog_urls_result {
-        Ok(dog_urls) => {
-            let dog_imgs: Vec<String> = dog_urls.into_iter().map(create_img_tag).collect();
-            Ok(HttpResponse::Ok()
-                .content_type("text/html")
-                .body(dog_imgs.join("")))
-        }
+    match dog_api::get_dog_urls(5).await {
+        Ok(dog_urls) => Ok(HttpResponse::Ok().content_type("text/html").body(
+            dog_urls
+                .into_iter()
+                .map(create_img_tag)
+                .collect::<Vec<String>>()
+                .join(""),
+        )),
         Err(error) => Ok(HttpResponse::from_error(actix_http::error::Error::from(
             error,
         ))),

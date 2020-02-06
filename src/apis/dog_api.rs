@@ -8,30 +8,25 @@ pub struct ApiResponse {
 }
 
 async fn fetch_random_dog_payload() -> Result<ApiResponse, failure::Error> {
-    let response = reqwest::get("https://dog.ceo/api/breeds/image/random")
+    Ok(reqwest::get("https://dog.ceo/api/breeds/image/random")
         .await?
         .json::<ApiResponse>()
-        .await?;
-
-    Ok(response)
+        .await?)
 }
 
 pub async fn get_dog_urls(count: usize) -> Result<Vec<String>, failure::Error> {
-    let mut i = 0;
-    let mut futs = Vec::new();
-
-    while i < count {
-        i += 1;
-
-        futs.push(fetch_random_dog_payload());
-    }
-
-    Ok(join_all(futs)
-        .await
-        .into_iter()
-        .map(|result| match result {
-            Ok(payload) => payload.message,
-            Err(error) => error.to_string(),
-        })
-        .collect())
+    // Creating an 'empty' vector here so it can be filled with futures
+    // Is there a better way to do this?
+    Ok(join_all(
+        vec![0; count]
+            .into_iter()
+            .map(|_x| fetch_random_dog_payload()),
+    )
+    .await
+    .into_iter()
+    .map(|result| match result {
+        Ok(payload) => payload.message,
+        Err(error) => error.to_string(),
+    })
+    .collect())
 }
