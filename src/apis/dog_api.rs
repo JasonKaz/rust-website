@@ -1,4 +1,3 @@
-use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -7,26 +6,30 @@ pub struct ApiResponse {
     status: String,
 }
 
+impl ApiResponse {
+    pub fn into_message(self) -> String {
+        self.message
+    }
+}
+
 async fn fetch_random_dog_payload() -> Result<ApiResponse, failure::Error> {
-    Ok(reqwest::get("https://dog.ceo/api/breeds/image/random")
+    reqwest::get("https://dog.ceo/api/breeds/image/random")
         .await?
         .json::<ApiResponse>()
-        .await?)
+        .await
+        .map_err(Into::into)
 }
 
 pub async fn get_dog_urls(count: usize) -> Result<Vec<String>, failure::Error> {
-    // Creating an 'empty' vector here so it can be filled with futures
-    // Is there a better way to do this?
-    Ok(join_all(
-        vec![0; count]
-            .into_iter()
-            .map(|_x| fetch_random_dog_payload()),
-    )
-    .await
-    .into_iter()
-    .map(|result| match result {
-        Ok(payload) => payload.message,
-        Err(error) => error.to_string(),
-    })
-    .collect())
+    use futures::stream::StreamExt;
+    use futures::stream::TryStreamExt;
+    
+    futures::stream::iter(1..=count)
+        .then(|_| async move {
+            fetch_random_dog_payload()
+                .await
+                .map(ApiResponse::into_message)
+        })
+        .try_collect()
+        .await
 }
